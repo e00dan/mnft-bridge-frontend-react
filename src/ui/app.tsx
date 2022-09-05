@@ -6,7 +6,7 @@ import './app.css';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { ethers, providers } from 'ethers';
-import { Address, AddressType, LockType } from '@lay2/pw-core';
+import { Address, AddressType, LockType, NervosAddressVersion } from '@lay2/pw-core';
 import { PortalWalletWrapper } from './pwcore';
 import { getNFTsAtAddress } from './nft/api';
 import { EnrichedMNFT, TransactionBuilderExpectedMNFTData } from './nft/nft';
@@ -41,6 +41,7 @@ export function App() {
     const [MNFTs, setMNFTs] = useState<EnrichedMNFT[]>();
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const [receiverAddress, setReceiverAddress] = useState<string>();
+    const [layerOneAddress, setLayerOneAddress] = useState<string>();
     const [layerOneTransactionHash, setLayerOneTransactionHash] = useState<string>();
     const [portalWalletWrapper, setPortalWalletWrapper] = useState<PortalWalletWrapper>();
 
@@ -137,9 +138,23 @@ export function App() {
         })();
     });
 
+    useEffect(() => {
+        if (portalWalletWrapper && account) {
+            setLayerOneAddress(
+                new Address(account, AddressType.eth, undefined, LockType.pw).toCKBAddress(
+                    NervosAddressVersion.latest
+                )
+            );
+        } else {
+            setLayerOneAddress('');
+        }
+    }, [portalWalletWrapper, account]);
+
     return (
         <div>
-            Your ETH address: <b>{account}</b>
+            Your ETH address (Portal Wallet): <b>{account}</b>
+            <br />
+            Your CKB address: <b>{layerOneAddress}</b>
             <br />
             <br />
             <hr />
