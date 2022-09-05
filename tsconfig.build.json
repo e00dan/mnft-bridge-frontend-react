@@ -5,7 +5,7 @@
         "declaration": true,
         "module": "commonjs",
         "moduleResolution": "node",
-        "target": "esnext",
+        "target": "es5",
         "jsx": "react",
         "allowSyntheticDefaultImports": true,
         "resolveJsonModule": true,

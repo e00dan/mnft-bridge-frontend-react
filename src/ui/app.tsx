@@ -189,9 +189,7 @@ export function App() {
                                         type="checkbox"
                                         onChange={e => {
                                             if (e.target.checked) {
-                                                setSelectedItems([
-                                                    ...new Set(selectedItems.concat(mnft.tokenId))
-                                                ]);
+                                                setSelectedItems([...selectedItems, mnft.tokenId]);
                                             } else {
                                                 setSelectedItems(
                                                     selectedItems.filter(i => i !== mnft.tokenId)

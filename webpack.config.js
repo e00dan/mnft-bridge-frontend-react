@@ -7,7 +7,7 @@ module.exports = {
     entry: './src/ui/index.tsx',
     output: {
         filename: 'bundle.js',
-        path: path.join(__dirname, '/../dist')
+        path: path.join(__dirname, 'dist')
     },
     mode: 'development',
     devtool: 'source-map',
@@ -24,7 +24,7 @@ module.exports = {
             // http: 'stream-http',
             // https: 'https-browserify',
             // os: 'os-browserify/browser',
-            process: 'process/browser',
+            process: 'process/browser'
             // vm: 'vm-browserify'
         })
     ],
