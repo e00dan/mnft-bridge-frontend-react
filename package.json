@@ -14,24 +14,24 @@
         "test": "test"
     },
     "scripts": {
-        "build": "yarn compile && yarn build:ts",
-        "build:ts": "tsc -b tsconfig.build.json --verbose --pretty",
+        "build": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" webpack build",
         "clean": "shx rm -rf dist build",
         "compile": "hardhat compile",
         "start:ethereum": "hardhat node",
         "prettier": "prettier --write --config-precedence file-override './src/**/*'",
         "test": "hardhat test",
-        "ui": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" webpack serve",
-        "ui:build": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" webpack build"
+        "ui": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" webpack serve"
     },
     "types": "dist/js/src/index.d.ts",
     "dependencies": {
         "@ckb-lumos/codec": "0.17.0",
         "@ckb-lumos/lumos": "0.17.0",
-        "@lay2/pw-core": "0.5.0-alpha.3",
+        "@lay2/pw-core": "~0.4.0-alpha.13",
         "ethers": "^5.6.1",
         "node-fetch": "2.6.7",
-        "react-toastify": "^7.0.4"
+        "react-toastify": "^7.0.4",
+        "up-ckb-alpha-test": "0.1.5",
+        "up-core-test": "0.1.12"
     },
     "devDependencies": {
         "@nomiclabs/hardhat-ethers": "2.0.5",

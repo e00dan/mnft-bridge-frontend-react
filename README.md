@@ -9,7 +9,7 @@ yarn && yarn ui
 ## Build
 
 ```
-yarn ui:build
+yarn build
 ```
 
 ## Bridge Architecture

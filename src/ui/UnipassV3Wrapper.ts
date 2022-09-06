@@ -4,15 +4,18 @@ import PWCore, {
     ChainID,
     Config,
     IndexerCollector,
-    EthProvider,
     Cell,
     RPC,
     BuilderOption,
     OutPoint,
     CellDep,
     DepType,
-    Builder
+    Builder,
+    EthProvider
 } from '@lay2/pw-core';
+import UP from 'up-core-test';
+import UPCKB from 'up-ckb-alpha-test';
+
 import { CONFIG } from './nft/config';
 import { TransactionBuilderExpectedMNFTData } from './nft/nft';
 import { TransferNFTBuilder } from './nft/TransferNFTBuilder';
@@ -46,7 +49,13 @@ export function getOutPoint(nfts: TransactionBuilderExpectedMNFTData[]): OutPoin
     return outpoints;
 }
 
-export class PortalWalletWrapper {
+export class UnipassV3Wrapper {
+    public username: string;
+
+    public myAddress: string;
+
+    public myBalance: string;
+
     private _collector: IndexerCollector;
 
     private _pwCore: PWCore;
@@ -71,8 +80,18 @@ export class PortalWalletWrapper {
         await this._pwCore?.init(this._provider, this._collector);
 
         if (pwCore) {
+            UP.config({
+                domain: process.env.UNIPASS_URL
+            });
             this._pwCore = pwCore;
             PWCore.setChainId(pwChainId, pwConfig);
+            UPCKB.config({
+                upSnapshotUrl: `${process.env.AGGREGATOR_URL}/snapshot/`,
+                chainID: Number(process.env.PW_CORE_CHAIN_ID),
+                ckbIndexerUrl: process.env.CKB_INDEXER_URL,
+                ckbNodeUrl: process.env.CKB_NODE_URL,
+                upLockCodeHash: process.env.ASSET_LOCK_CODE_HASH as string
+            });
         }
     }
 
@@ -114,5 +133,23 @@ export class PortalWalletWrapper {
         console.log(`Transaction submitted: ${txId}`);
 
         return txId;
+    }
+
+    async connect() {
+        console.log('connect clicked');
+        try {
+            const account = await UP.connect({ email: false, evmKeys: true });
+            this.username = account.username;
+            console.log('account', account);
+            const address: Address = UPCKB.getCKBAddress(this.username);
+            this.myAddress = address.toCKBAddress();
+            const indexerCollector = new IndexerCollector(process.env.CKB_INDEXER_URL as string);
+            const balance = await indexerCollector.getBalance(address as Address);
+            console.log('balance', balance);
+            this.myBalance = balance.toString();
+        } catch (err) {
+            // this.$message.error(err as string);
+            console.log('connect err', err);
+        }
     }
 }

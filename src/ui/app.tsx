@@ -11,6 +11,7 @@ import { PortalWalletWrapper } from './pwcore';
 import { getNFTsAtAddress } from './nft/api';
 import { EnrichedMNFT, TransactionBuilderExpectedMNFTData } from './nft/nft';
 import { CONFIG } from './nft/config';
+import { UnipassV3Wrapper } from './UnipassV3Wrapper';
 
 async function createWeb3() {
     // Modern dapp browsers...
@@ -44,13 +45,14 @@ export function App() {
     const [layerOneAddress, setLayerOneAddress] = useState<string>();
     const [layerOneTransactionHash, setLayerOneTransactionHash] = useState<string>();
     const [portalWalletWrapper, setPortalWalletWrapper] = useState<PortalWalletWrapper>();
+    const [unipassV3Wrapper, setUnipassV3Wrapper] = useState<UnipassV3Wrapper>();
 
     const account = accounts?.[0];
 
     async function fetchMNFTs() {
         setSelectedItems([]);
         try {
-            const address = new Address(account, AddressType.eth, undefined, LockType.pw);
+            const address = new Address(account, AddressType.eth);
             const _MNFTs = await getNFTsAtAddress(address);
             const _processedMNFTs: EnrichedMNFT[] = [];
 
@@ -141,9 +143,7 @@ export function App() {
     useEffect(() => {
         if (portalWalletWrapper && account) {
             setLayerOneAddress(
-                new Address(account, AddressType.eth, undefined, LockType.pw).toCKBAddress(
-                    NervosAddressVersion.latest
-                )
+                new Address(account, AddressType.eth).toCKBAddress(NervosAddressVersion.latest)
             );
         } else {
             setLayerOneAddress('');
