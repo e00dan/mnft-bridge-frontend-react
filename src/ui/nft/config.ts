@@ -10,5 +10,13 @@ export const CONFIG = {
     UNIPASS_V2_CODE_HASH: '0x124a60cd799e1fbca664196de46b3f7f0ecb7138133dcaea4893c51df5b02be6',
 
     LAYER_ONE_BRIDGE_CKB_ADDRESS:
-        'ckt1q3vvtay34wndv9nckl8hah6fzzcltcqwcrx79apwp2a5lkd07fdxxdg9jh57vt96p4e9clx2wpra62vn7h8vv04el9d'
+        'ckt1q3vvtay34wndv9nckl8hah6fzzcltcqwcrx79apwp2a5lkd07fdxxdg9jh57vt96p4e9clx2wpra62vn7h8vv04el9d',
+
+    // ckb 0 ckb_testnet 1 ckb_dev 2
+    PW_CORE_CHAIN_ID: 1,
+
+    UNIPASS_URL: 't.app.unipass.id',
+    UNIPASS_ASSET_LOCK_CODE_HASH:
+        '0x3e1eb7ed4809b2d60650be96a40abfbdafb3fb942b7b37ec7709e64e2cd0a783',
+    UNIPASS_AGGREGATOR_URL: 'https://t.aggregator.unipass.id/dev/'
 };

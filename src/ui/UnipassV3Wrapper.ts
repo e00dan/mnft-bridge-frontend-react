@@ -1,8 +1,7 @@
+/* eslint-disable no-param-reassign */
 import PWCore, {
     Address,
     AddressType,
-    ChainID,
-    Config,
     IndexerCollector,
     Cell,
     RPC,
@@ -11,15 +10,24 @@ import PWCore, {
     CellDep,
     DepType,
     Builder,
-    EthProvider
+    DefaultSigner,
+    Transaction,
+    Reader,
+    transformers
 } from '@lay2/pw-core';
 import UP from 'up-core-test';
-import UPCKB from 'up-ckb-alpha-test';
+import UPCKB, {
+    AssetLockProof,
+    completeTxWithProof,
+    fetchAssetLockProof,
+    UPCKBBaseProvider
+} from 'up-ckb-alpha-test';
 
 import { CONFIG } from './nft/config';
 import { TransactionBuilderExpectedMNFTData } from './nft/nft';
 import { TransferNFTBuilder } from './nft/TransferNFTBuilder';
 import BasicCollector from './nft/BasicCollector';
+import { UPCoreSimpleProvider } from './UpCoreSimpleProvider';
 
 const AggronCellDeps = [
     new CellDep(
@@ -52,47 +60,28 @@ export function getOutPoint(nfts: TransactionBuilderExpectedMNFTData[]): OutPoin
 export class UnipassV3Wrapper {
     public username: string;
 
-    public myAddress: string;
+    public layerOneAddress: Address;
 
     public myBalance: string;
 
     private _collector: IndexerCollector;
 
-    private _pwCore: PWCore;
-
-    private _provider: EthProvider;
-
-    constructor() {
-        this._pwCore = new PWCore(CONFIG.CKB_NODE_RPC_URL);
-    }
-
-    public async init({
-        pwCore,
-        pwConfig,
-        pwChainId = ChainID.ckb_testnet
-    }: {
-        pwCore?: PWCore;
-        pwConfig?: Config;
-        pwChainId?: ChainID;
-    }) {
-        this._provider = new EthProvider();
+    public async init() {
         this._collector = new IndexerCollector(CONFIG.CKB_INDEXER_RPC_URL);
-        await this._pwCore?.init(this._provider, this._collector);
 
-        if (pwCore) {
-            UP.config({
-                domain: process.env.UNIPASS_URL
-            });
-            this._pwCore = pwCore;
-            PWCore.setChainId(pwChainId, pwConfig);
-            UPCKB.config({
-                upSnapshotUrl: `${process.env.AGGREGATOR_URL}/snapshot/`,
-                chainID: Number(process.env.PW_CORE_CHAIN_ID),
-                ckbIndexerUrl: process.env.CKB_INDEXER_URL,
-                ckbNodeUrl: process.env.CKB_NODE_URL,
-                upLockCodeHash: process.env.ASSET_LOCK_CODE_HASH as string
-            });
-        }
+        UP.config({
+            domain: CONFIG.UNIPASS_URL
+        });
+
+        PWCore.setChainId(CONFIG.PW_CORE_CHAIN_ID);
+
+        UPCKB.config({
+            upSnapshotUrl: `${CONFIG.UNIPASS_AGGREGATOR_URL}/snapshot/`,
+            chainID: CONFIG.PW_CORE_CHAIN_ID,
+            ckbIndexerUrl: CONFIG.CKB_INDEXER_RPC_URL,
+            ckbNodeUrl: CONFIG.CKB_NODE_RPC_URL,
+            upLockCodeHash: CONFIG.UNIPASS_ASSET_LOCK_CODE_HASH
+        });
     }
 
     async bridgeMNFTS(
@@ -103,7 +92,10 @@ export class UnipassV3Wrapper {
         const outpoints = getOutPoint(nfts);
         console.log(toLayerOneAddress, outpoints);
 
-        const provider = this._provider;
+        const provider = new UPCoreSimpleProvider(
+            this.username,
+            CONFIG.UNIPASS_ASSET_LOCK_CODE_HASH
+        );
         const fromAddress = provider.address;
         const toAddress = new Address(toLayerOneAddress, AddressType.ckb);
 
@@ -115,7 +107,7 @@ export class UnipassV3Wrapper {
         console.log('[cells]', cells);
 
         const builderOption: BuilderOption = {
-            witnessArgs: Builder.WITNESS_ARGS.Secp256k1,
+            witnessArgs: Builder.WITNESS_ARGS.RawSecp256k1,
             collector: this._collector
         };
         const cellDeps = AggronCellDeps;
@@ -129,27 +121,52 @@ export class UnipassV3Wrapper {
         );
         const transaction = await builder.build();
 
-        const txId = await this._pwCore.sendTransaction(transaction);
+        const txId = await this.sendTransaction(transaction, provider);
         console.log(`Transaction submitted: ${txId}`);
 
         return txId;
     }
 
     async connect() {
-        console.log('connect clicked');
-        try {
-            const account = await UP.connect({ email: false, evmKeys: true });
-            this.username = account.username;
-            console.log('account', account);
-            const address: Address = UPCKB.getCKBAddress(this.username);
-            this.myAddress = address.toCKBAddress();
-            const indexerCollector = new IndexerCollector(process.env.CKB_INDEXER_URL as string);
-            const balance = await indexerCollector.getBalance(address as Address);
-            console.log('balance', balance);
-            this.myBalance = balance.toString();
-        } catch (err) {
-            // this.$message.error(err as string);
-            console.log('connect err', err);
+        const account = await UP.connect({ email: false, evmKeys: true });
+        this.username = account.username;
+        console.log('account', account);
+        this.layerOneAddress = UPCKB.getCKBAddress(this.username);
+        const indexerCollector = new IndexerCollector(CONFIG.CKB_INDEXER_RPC_URL);
+        const balance = await indexerCollector.getBalance(this.layerOneAddress);
+        console.log('balance', balance);
+        this.myBalance = balance.toString();
+    }
+
+    private async sendTransaction(tx: Transaction, provider: UPCKBBaseProvider): Promise<string> {
+        // save old cell deps and restore old cell deps after complete tx
+        const oldCellDeps = tx.raw.cellDeps;
+        tx.raw.cellDeps = [];
+        const signer = new DefaultSigner(provider);
+        const signedTx = await signer.sign(tx);
+
+        const rpc = new RPC(CONFIG.CKB_NODE_RPC_URL);
+        return this.sendUPLockTransaction(provider.usernameHash, signedTx, rpc, oldCellDeps);
+    }
+
+    private async sendUPLockTransaction(
+        usernameHash: string,
+        signedTx: Transaction,
+        rpc: RPC,
+        oldCellDeps: CellDep[]
+    ) {
+        // fetch cellDeps/userinfo/proof from aggregator
+        const assetLockProof: AssetLockProof = await fetchAssetLockProof(usernameHash);
+        if (new Reader(assetLockProof.lockInfo[0].userInfo).length() === 0) {
+            throw new Error('user not registered');
         }
+
+        // fill tx cell deps and witness
+        (assetLockProof as any).cellDeps = [...assetLockProof.cellDeps, ...oldCellDeps];
+        const completedSignedTx = completeTxWithProof(signedTx, assetLockProof, usernameHash);
+
+        const transformedTx = transformers.TransformTransaction(completedSignedTx);
+        const txHash = await rpc.send_transaction(transformedTx, 'passthrough');
+        return txHash;
     }
 }

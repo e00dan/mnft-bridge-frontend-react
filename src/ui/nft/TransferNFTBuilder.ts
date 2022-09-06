@@ -24,7 +24,7 @@ export class TransferNFTBuilder extends Builder {
         super(options.feeRate, collector, options.witnessArgs);
     }
 
-    async build(fee = new Amount('10000', AmountUnit.shannon)): Promise<Transaction> {
+    async build(fee = new Amount('100000', AmountUnit.shannon)): Promise<Transaction> {
         const inputCells: Cell[] = [];
         const outputCells: Cell[] = [];
 
@@ -79,12 +79,15 @@ export class TransferNFTBuilder extends Builder {
         outputCells.push(changeCell);
 
         // Add the required cell deps.
-        const cellDeps = [
-            ...this.cellDeps,
-            PWCore.config.defaultLock.cellDep,
-            PWCore.config.pwLock.cellDep,
-            PWCore.config.sudtType.cellDep
-        ];
+        const cellDeps = [...this.cellDeps];
+
+        if (PWCore.config) {
+            cellDeps.push(
+                PWCore.config.defaultLock.cellDep,
+                PWCore.config.pwLock.cellDep,
+                PWCore.config.sudtType.cellDep
+            );
+        }
 
         const rawTx = new RawTransaction(inputCells, outputCells, cellDeps);
 

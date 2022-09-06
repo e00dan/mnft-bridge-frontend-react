@@ -39,21 +39,54 @@ async function createWeb3() {
 export function App() {
     const [web3, setWeb3] = useState<providers.Web3Provider>(null);
     const [accounts, setAccounts] = useState<string[]>();
-    const [MNFTs, setMNFTs] = useState<EnrichedMNFT[]>();
+    const [MNFTs, setMNFTs] = useState<EnrichedMNFT[] | undefined>();
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const [receiverAddress, setReceiverAddress] = useState<string>();
-    const [layerOneAddress, setLayerOneAddress] = useState<string>();
+    const [layerOneAddress, setLayerOneAddress] = useState<Address>();
+    const [layerOneAddressString, setLayerOneAddressString] = useState<string>();
     const [layerOneTransactionHash, setLayerOneTransactionHash] = useState<string>();
     const [portalWalletWrapper, setPortalWalletWrapper] = useState<PortalWalletWrapper>();
     const [unipassV3Wrapper, setUnipassV3Wrapper] = useState<UnipassV3Wrapper>();
 
     const account = accounts?.[0];
 
+    async function connectPortalWallet() {
+        if (portalWalletWrapper) {
+            return;
+        }
+
+        (async () => {
+            const _web3 = await createWeb3();
+            setWeb3(_web3);
+
+            const _accounts = [(window as any).ethereum.selectedAddress];
+            setAccounts(_accounts);
+            console.log({ _accounts });
+
+            const wrapper = new PortalWalletWrapper();
+            await wrapper.init({});
+
+            setPortalWalletWrapper(wrapper);
+        })();
+    }
+
+    async function connectUnipass() {
+        (async () => {
+            const wrapper = new UnipassV3Wrapper();
+            await wrapper.init();
+            await wrapper.connect();
+
+            setLayerOneAddress(wrapper.layerOneAddress);
+
+            setUnipassV3Wrapper(wrapper);
+        })();
+    }
+
     async function fetchMNFTs() {
+        setMNFTs(undefined);
         setSelectedItems([]);
         try {
-            const address = new Address(account, AddressType.eth);
-            const _MNFTs = await getNFTsAtAddress(address);
+            const _MNFTs = await getNFTsAtAddress(layerOneAddress);
             const _processedMNFTs: EnrichedMNFT[] = [];
 
             for (const token of _MNFTs) {
@@ -83,9 +116,10 @@ export function App() {
 
     async function bridgeSelectedItems() {
         const _processedMNFTs: TransactionBuilderExpectedMNFTData[] = [];
+        const selectedMNFTs = MNFTs.filter(mnft => selectedItems.includes(mnft.tokenId));
 
         try {
-            for (const { token: nft } of MNFTs) {
+            for (const { token: nft } of selectedMNFTs) {
                 const classTypeArgs = nft.nftClassCell?.output.type?.args;
                 const nftTypeArgs = nft.typeScriptArguments;
 
@@ -106,11 +140,21 @@ export function App() {
                 _processedMNFTs.push(unipassExpectedNft);
             }
 
-            const transactionId = await portalWalletWrapper.bridgeMNFTS(
-                CONFIG.LAYER_ONE_BRIDGE_CKB_ADDRESS,
-                _processedMNFTs,
-                receiverAddress
-            );
+            let transactionId: string;
+
+            if (portalWalletWrapper) {
+                transactionId = await portalWalletWrapper.bridgeMNFTS(
+                    CONFIG.LAYER_ONE_BRIDGE_CKB_ADDRESS,
+                    _processedMNFTs,
+                    receiverAddress
+                );
+            } else {
+                transactionId = await unipassV3Wrapper.bridgeMNFTS(
+                    CONFIG.LAYER_ONE_BRIDGE_CKB_ADDRESS,
+                    _processedMNFTs,
+                    receiverAddress
+                );
+            }
 
             setLayerOneTransactionHash(transactionId);
             toast.success(`Successfully sent Layer 1 transaction.`);
@@ -121,45 +165,47 @@ export function App() {
     }
 
     useEffect(() => {
-        if (web3) {
-            return;
-        }
-
-        (async () => {
-            const _web3 = await createWeb3();
-            setWeb3(_web3);
-
-            const _accounts = [(window as any).ethereum.selectedAddress];
-            setAccounts(_accounts);
-            console.log({ _accounts });
-
-            const wrapper = new PortalWalletWrapper();
-            await wrapper.init({});
-
-            setPortalWalletWrapper(wrapper);
-        })();
-    });
-
-    useEffect(() => {
-        if (portalWalletWrapper && account) {
-            setLayerOneAddress(
-                new Address(account, AddressType.eth).toCKBAddress(NervosAddressVersion.latest)
-            );
-        } else {
-            setLayerOneAddress('');
+        if (portalWalletWrapper) {
+            if (account) {
+                setLayerOneAddress(new Address(account, AddressType.eth));
+            } else {
+                setLayerOneAddress(undefined);
+            }
         }
     }, [portalWalletWrapper, account]);
 
+    useEffect(() => {
+        if (layerOneAddress) {
+            setLayerOneAddressString(layerOneAddress.toCKBAddress(NervosAddressVersion.latest));
+        } else {
+            setLayerOneAddressString(undefined);
+        }
+    }, [layerOneAddress]);
+
     return (
         <div>
-            Your ETH address (Portal Wallet): <b>{account}</b>
-            <br />
-            Your CKB address: <b>{layerOneAddress}</b>
+            <button onClick={() => connectPortalWallet()} disabled={Boolean(layerOneAddressString)}>
+                Connect Portal Wallet (MetaMask)
+            </button>
+            &nbsp;
+            <button onClick={() => connectUnipass()} disabled={Boolean(layerOneAddressString)}>
+                Connect Unipass V3
+            </button>
             <br />
             <br />
             <hr />
-            <button onClick={() => fetchMNFTs()} disabled={!account}>
-                Fetch mNFTs on your PortalWallet account
+            {account && (
+                <span>
+                    Your ETH address (Portal Wallet): <b>{account}</b>
+                </span>
+            )}
+            <br />
+            Your CKB address: <b>{layerOneAddressString}</b>
+            <br />
+            <br />
+            <hr />
+            <button onClick={() => fetchMNFTs()} disabled={!layerOneAddress}>
+                Fetch mNFTs on your Nervos Layer 1 account
             </button>
             <br />
             <br />
@@ -175,7 +221,7 @@ export function App() {
             <br />
             <button
                 onClick={() => bridgeSelectedItems()}
-                disabled={!account || selectedItems.length === 0}
+                disabled={!layerOneAddress || selectedItems.length === 0 || !receiverAddress}
             >
                 Bridge selected mNFTs
             </button>
@@ -187,7 +233,7 @@ export function App() {
                 </span>
             )}
             <hr />
-            {MNFTs && (
+            {MNFTs && MNFTs.length !== 0 && (
                 <table>
                     <thead>
                         <tr>
@@ -224,6 +270,9 @@ export function App() {
                         ))}
                     </tbody>
                 </table>
+            )}
+            {MNFTs && MNFTs.length === 0 && (
+                <div>You do not have mNFTs on this Layer 1 CKB address.</div>
             )}
             <br />
             <br />
