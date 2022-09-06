@@ -16,7 +16,7 @@ yarn build
 
 Frontends:
 1. Unipass v2: [Website](https://mnft.nervosdao.community/) | [Code](https://github.com/Kuzirashi/mnft-bridge-frontend)
-2. Portal Wallet: [Website](https://mnft-pw.nervosdao.community) | [Code](https://github.com/Kuzirashi/mnft-bridge-frontend-react)
+2. Portal Wallet + Unipass v3: [Website](https://mnft-pw.nervosdao.community) | [Code](https://github.com/Kuzirashi/mnft-bridge-frontend-react)
 
 Operator: https://github.com/Kuzirashi/mnft-godwoken
 
