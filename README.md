@@ -1,4 +1,6 @@
-# Nervos mNFT to Godwoken bridge (PortalWallet)
+# Nervos mNFT to Godwoken bridge
+
+This bridge frontend supports both mNFT transfers from Portal Wallet as well as Unipass v3.
 
 ## Run
 
